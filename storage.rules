@@ -1,0 +1,9 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /product-images/{imageId} {
+      allow read: if true; // Public read for product images
+      allow write, delete: if request.auth != null; // Only authenticated admin can upload/delete images
+    }
+  }
+}
