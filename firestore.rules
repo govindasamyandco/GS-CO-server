@@ -1,28 +1,29 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Helper function to check if user is authenticated admin
-    function isAdmin() {
-      return request.auth != null && request.auth.token.email == "govindasamy.textitle@gmail.com";
-    }
 
-    // Products Collection
+    // Mat Products Collection: Public Read-Only for user site; Admin Custom Claim required for direct writes
     match /products/{productId} {
-      allow read: if true; // Anyone (customers & admin) can view products
-      allow create, update, delete: if isAdmin(); // Only Admin can add/edit/delete products
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.token.admin == true;
     }
 
-    // Categories Collection
+    // Categories Collection: Public Read, Admin Write
     match /categories/{categoryId} {
       allow read: if true;
-      allow create, update, delete: if isAdmin();
+      allow write: if request.auth != null && request.auth.token.admin == true;
     }
 
-    // Orders Collection
+    // Customer Wholesale Orders: Public Create; Admin Read/Update
     match /orders/{orderId} {
-      allow create: if true; // Customers can submit orders
-      allow read, update, delete: if isAdmin() || (request.auth != null && request.auth.uid == resource.data.userId);
+      allow create: if true;
+      allow read, update, delete: if request.auth != null && request.auth.token.admin == true;
+    }
+
+    // Security Audit Logs: Strict Admin-Only Read; Cloud Functions Server SDK Write Only
+    match /audit_logs/{logId} {
+      allow read: if request.auth != null && request.auth.token.admin == true;
+      allow write: if false; // Only Cloud Functions Admin SDK can write
     }
   }
 }
