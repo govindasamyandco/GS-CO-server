@@ -210,3 +210,63 @@ exports.deleteProduct = onCall(async (request) => {
 
   return { success: true, productId };
 });
+
+// ==========================================================================
+// HTTP Server for Render Hosting (Web Service Mode)
+// Listens on process.env.PORT so Render Web Service stays permanently active
+// and provides live health check endpoints.
+// ==========================================================================
+const http = require("http");
+
+const server = http.createServer((req, res) => {
+  // Global CORS Headers
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+  if (req.method === "OPTIONS") {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+
+  // Health Check Endpoint for Render Deployments
+  if (req.url === "/" || req.url === "/health") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(
+      JSON.stringify({
+        status: "LIVE",
+        service: "Govindasamy & Co - Cloud Architecture & API Server",
+        timestamp: new Date().toISOString(),
+        cloudDatabase: "Firestore",
+        cloudStorage: "Firebase Storage",
+        endpoints: ["/health", "/api/status"]
+      })
+    );
+    return;
+  }
+
+  if (req.url === "/api/status") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(
+      JSON.stringify({
+        project: "govindasamyandco",
+        functions: ["addProduct", "updateProduct", "deleteProduct", "logSecurityAudit"],
+        uptime: process.uptime()
+      })
+    );
+    return;
+  }
+
+  res.writeHead(404, { "Content-Type": "application/json" });
+  res.end(JSON.stringify({ error: "Endpoint not found" }));
+});
+
+// Automatically start listening on PORT when run directly by Render
+if (require.main === module || process.env.PORT) {
+  const PORT = process.env.PORT || 10000;
+  server.listen(PORT, "0.0.0.0", () => {
+    console.log(`🚀 Govindasamy & Co Server listening on port ${PORT}`);
+    console.log(`📡 Health check ready at http://0.0.0.0:${PORT}/health`);
+  });
+}
