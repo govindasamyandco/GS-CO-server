@@ -2,27 +2,40 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Mat Products Collection: Public Read-Only for user site; Admin Custom Claim required for direct writes
+    function isStoreAdmin() {
+      return request.auth != null && (
+        request.auth.token.admin == true || 
+        request.auth.token.email == 'govindasamy.textile@gmail.com'
+      );
+    }
+
+    // Mat Products Collection: Public Read-Only for user site; Admin required for direct writes
     match /products/{productId} {
       allow read: if true;
-      allow write: if request.auth != null && request.auth.token.admin == true;
+      allow write: if isStoreAdmin();
     }
 
     // Categories Collection: Public Read, Admin Write
     match /categories/{categoryId} {
       allow read: if true;
-      allow write: if request.auth != null && request.auth.token.admin == true;
+      allow write: if isStoreAdmin();
     }
 
-    // Customer Wholesale Orders: Public Create; Admin Read/Update
+    // Customer Wholesale Orders: Validated Public Create; Admin Read/Update/Delete
     match /orders/{orderId} {
-      allow create: if true;
-      allow read, update, delete: if request.auth != null && request.auth.token.admin == true;
+      allow create: if request.resource.data.keys().hasAll(['companyName', 'contactPerson', 'phone', 'address', 'items', 'status', 'createdAt'])
+                    && request.resource.data.companyName is string && request.resource.data.companyName.size() >= 1 && request.resource.data.companyName.size() <= 200
+                    && request.resource.data.contactPerson is string && request.resource.data.contactPerson.size() >= 1 && request.resource.data.contactPerson.size() <= 100
+                    && request.resource.data.phone is string && request.resource.data.phone.size() >= 10 && request.resource.data.phone.size() <= 20
+                    && request.resource.data.address is string && request.resource.data.address.size() >= 1 && request.resource.data.address.size() <= 500
+                    && request.resource.data.items is list && request.resource.data.items.size() >= 1 && request.resource.data.items.size() <= 100
+                    && request.resource.data.status == 'PENDING_CONFIRMATION';
+      allow read, update, delete: if isStoreAdmin();
     }
 
     // Security Audit Logs: Strict Admin-Only Read; Cloud Functions Server SDK Write Only
     match /audit_logs/{logId} {
-      allow read: if request.auth != null && request.auth.token.admin == true;
+      allow read: if isStoreAdmin();
       allow write: if false; // Only Cloud Functions Admin SDK can write
     }
   }

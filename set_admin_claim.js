@@ -3,14 +3,21 @@
  * Usage: node set_admin_claim.js <USER_EMAIL_OR_UID>
  */
 
-const admin = require("firebase-admin");
+let admin;
+try {
+  admin = require("firebase-admin");
+} catch {
+  admin = require("./functions/node_modules/firebase-admin");
+}
 
 // Initialize Firebase Admin with Default Credentials or Service Account
 if (!admin.apps.length) {
-  admin.initializeApp();
+  admin.initializeApp({
+    projectId: process.env.FIREBASE_PROJECT_ID || "govindasamyandco"
+  });
 }
 
-const targetEmail = process.argv[2] || "govindasamy.textitle@gmail.com";
+const targetEmail = process.argv[2] || process.env.ADMIN_EMAIL || "govindasamy.textile@gmail.com";
 
 async function grantAdminClaim(email) {
   try {

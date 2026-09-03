@@ -50,7 +50,7 @@ async function logSecurityAudit(action, adminUid, adminEmail, details) {
 exports.addProduct = onCall(async (request) => {
   verifyAdminClaim(request);
 
-  const { title, category, baseRate, unit, bundlePieces, bundlesPerPack, minOrderNotice, description, imageUrl } = request.data;
+  const { title, category, baseRate, unit, bundlePieces, bundlesPerPack, minOrderNotice, description, imageUrl, stockQty, seasonNotice } = request.data;
 
   if (!title || !category || isNaN(baseRate)) {
     throw new HttpsError("invalid-argument", "Missing required product fields.");
@@ -67,6 +67,8 @@ exports.addProduct = onCall(async (request) => {
     minOrderNotice: String(minOrderNotice || "").trim(),
     description: String(description || "").trim(),
     imageUrl: String(imageUrl || "public/assets/logo.jpg").trim(),
+    stockQty: Number(stockQty !== undefined ? stockQty : 100),
+    seasonNotice: String(seasonNotice || "Price may differ based on the season item or the stock quantity").trim(),
     createdAt: admin.firestore.FieldValue.serverTimestamp()
   };
 
@@ -83,9 +85,42 @@ exports.addProduct = onCall(async (request) => {
   return { success: true, productId: docRef.id };
 });
 
+const ALLOWED_PRODUCT_FIELDS = [
+  "title",
+  "category",
+  "baseRate",
+  "unit",
+  "bundlePieces",
+  "bundlesPerPack",
+  "compressibility",
+  "minOrderNotice",
+  "description",
+  "imageUrl",
+  "stockQty",
+  "seasonNotice",
+  "isDisabled"
+];
+
+/**
+ * Helper to extract Storage path from a Firebase Storage download URL
+ */
+function extractStoragePathFromUrl(downloadUrl) {
+  try {
+    if (!downloadUrl || typeof downloadUrl !== "string") return null;
+    if (!downloadUrl.includes("firebasestorage.googleapis.com")) return null;
+    const matches = downloadUrl.match(/\/o\/([^?]+)/);
+    if (matches && matches[1]) {
+      return decodeURIComponent(matches[1]);
+    }
+  } catch (e) {
+    console.warn("Error parsing storage URL:", e);
+  }
+  return null;
+}
+
 /**
  * Cloud Function: updateProduct
- * Verifies admin claim server-side before updating product
+ * Verifies admin claim server-side and applies strict field whitelisting
  */
 exports.updateProduct = onCall(async (request) => {
   verifyAdminClaim(request);
@@ -96,17 +131,34 @@ exports.updateProduct = onCall(async (request) => {
     throw new HttpsError("invalid-argument", "Product ID is required.");
   }
 
-  await db.collection("products").doc(productId).update({
-    ...updateData,
-    updatedAt: admin.firestore.FieldValue.serverTimestamp()
-  });
+  // Strict Field Whitelisting (Mass-Assignment Prevention)
+  const sanitizedUpdate = {};
+  for (const field of ALLOWED_PRODUCT_FIELDS) {
+    if (updateData[field] !== undefined) {
+      if (["baseRate", "bundlePieces", "bundlesPerPack", "compressibility", "stockQty"].includes(field)) {
+        sanitizedUpdate[field] = Number(updateData[field]);
+      } else if (field === "isDisabled") {
+        sanitizedUpdate[field] = Boolean(updateData[field]);
+      } else {
+        sanitizedUpdate[field] = String(updateData[field]).trim();
+      }
+    }
+  }
+
+  if (Object.keys(sanitizedUpdate).length === 0) {
+    throw new HttpsError("invalid-argument", "No valid update fields provided.");
+  }
+
+  sanitizedUpdate.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+
+  await db.collection("products").doc(productId).update(sanitizedUpdate);
 
   // Log Security Audit
   await logSecurityAudit(
     "UPDATE_PRODUCT",
     request.auth.uid,
     request.auth.token.email,
-    { productId, updatedFields: Object.keys(updateData) }
+    { productId, updatedFields: Object.keys(sanitizedUpdate) }
   );
 
   return { success: true, productId };
@@ -114,7 +166,7 @@ exports.updateProduct = onCall(async (request) => {
 
 /**
  * Cloud Function: deleteProduct
- * Verifies admin claim server-side before deleting product
+ * Verifies admin claim server-side and cleans up associated Storage assets
  */
 exports.deleteProduct = onCall(async (request) => {
   verifyAdminClaim(request);
@@ -126,7 +178,25 @@ exports.deleteProduct = onCall(async (request) => {
   }
 
   const docSnap = await db.collection("products").doc(productId).get();
-  const productTitle = docSnap.exists ? docSnap.data().title : "UNKNOWN";
+  if (!docSnap.exists) {
+    throw new HttpsError("not-found", "Product not found.");
+  }
+
+  const productData = docSnap.data();
+  const productTitle = productData.title || "UNKNOWN";
+
+  // Clean up associated image asset in Cloud Storage to prevent orphaned files
+  if (productData.imageUrl) {
+    const storagePath = extractStoragePathFromUrl(productData.imageUrl);
+    if (storagePath) {
+      try {
+        const bucket = admin.storage().bucket();
+        await bucket.file(storagePath).delete();
+      } catch (storageErr) {
+        console.warn("Storage asset cleanup warning:", storageErr.message);
+      }
+    }
+  }
 
   await db.collection("products").doc(productId).delete();
 
