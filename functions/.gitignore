@@ -1,0 +1,10 @@
+# =============================================================================
+# Govindasamy & Co - Firebase Functions .gitignore
+# =============================================================================
+
+node_modules/
+.env
+.env.local
+.env.*.local
+*.log
+serviceAccountKey.json

@@ -1,0 +1,112 @@
+const fs = require('fs');
+const path = require('path');
+
+const publicDir = path.join(__dirname, 'public');
+if (!fs.existsSync(publicDir)) {
+  fs.mkdirSync(publicDir, { recursive: true });
+}
+
+const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Govindasamy & Co - Cloud Server & Security API</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: #0a1628;
+      color: #f8fafc;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+    .card {
+      background: #0f2342;
+      border: 1px solid #1e3a68;
+      border-radius: 16px;
+      max-width: 650px;
+      width: 100%;
+      padding: 2.5rem 2rem;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+      text-align: center;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(34, 197, 94, 0.15);
+      color: #4ade80;
+      border: 1px solid #22c55e;
+      padding: 0.35rem 0.9rem;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 1.25rem;
+    }
+    .pulse {
+      width: 8px;
+      height: 8px;
+      background: #4ade80;
+      border-radius: 50%;
+      box-shadow: 0 0 10px #4ade80;
+    }
+    h1 { font-size: 1.8rem; margin-bottom: 0.5rem; color: #ffffff; }
+    p { color: #94a3b8; font-size: 0.95rem; margin-bottom: 1.5rem; line-height: 1.5; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+      text-align: left;
+      margin-top: 1.5rem;
+    }
+    .grid-item {
+      background: #0a1628;
+      border: 1px solid #1e3a68;
+      border-radius: 10px;
+      padding: 1rem;
+    }
+    .grid-item h3 { font-size: 0.85rem; color: #94a3b8; text-transform: uppercase; margin-bottom: 0.25rem; }
+    .grid-item span { font-size: 1rem; font-weight: 600; color: #38bdf8; }
+    .footer { margin-top: 2rem; font-size: 0.8rem; color: #64748b; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="badge"><div class="pulse"></div> Live & Operational</div>
+    <h1>Govindasamy & Co</h1>
+    <p>Firebase Serverless Cloud Architecture, Cloud Functions, and Real-Time Firestore Engine.</p>
+    
+    <div class="grid">
+      <div class="grid-item">
+        <h3>Cloud Database</h3>
+        <span>Cloud Firestore</span>
+      </div>
+      <div class="grid-item">
+        <h3>Cloud Storage</h3>
+        <span>Firebase Storage</span>
+      </div>
+      <div class="grid-item">
+        <h3>Security Rules</h3>
+        <span>Active & Enforced</span>
+      </div>
+      <div class="grid-item">
+        <h3>Functions Engine</h3>
+        <span>Node.js Cloud Functions</span>
+      </div>
+    </div>
+
+    <div class="footer">
+      Govindasamy & Co • Centralized Enterprise Backend Architecture
+    </div>
+  </div>
+</body>
+</html>
+`;
+
+fs.writeFileSync(path.join(publicDir, 'index.html'), html);
+console.log('Successfully built Govindasamy & Co Server Status Portal in /public');

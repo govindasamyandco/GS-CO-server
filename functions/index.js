@@ -66,7 +66,7 @@ exports.addProduct = onCall(async (request) => {
     compressibility: 0.80,
     minOrderNotice: String(minOrderNotice || "").trim(),
     description: String(description || "").trim(),
-    imageUrl: String(imageUrl || "public/assets/logo.jpg").trim(),
+    imageUrl: String(imageUrl || "/assets/logo.jpg").trim(),
     stockQty: Number(stockQty !== undefined ? stockQty : 100),
     seasonNotice: String(seasonNotice || "Price may differ based on the season item or the stock quantity").trim(),
     createdAt: admin.firestore.FieldValue.serverTimestamp()

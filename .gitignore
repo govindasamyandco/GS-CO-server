@@ -1,7 +1,51 @@
-# Environment variables
-.env
+# =============================================================================
+# Govindasamy & Co - Firebase Server Architecture .gitignore
+# =============================================================================
 
-# Firebase debug logs
-firebase-debug.log
-firestore-debug.log
-ui-debug.log
+# Dependencies
+node_modules/
+functions/node_modules/
+.pnp
+.pnp.js
+
+# Environment & Secrets (Keep .env.example tracked)
+.env
+.env.local
+.env.*.local
+.env.production
+functions/.env
+functions/.env.local
+functions/.env.*.local
+serviceAccountKey.json
+*credentials*.json
+
+# Firebase Runtime & Emulator Logs
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+functions-debug.log*
+
+# Logs & Debugging
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editor & IDE Files
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS Generated Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db

@@ -1,0 +1,13 @@
+{
+  "name": "govindasamy-co-server",
+  "version": "1.0.0",
+  "description": "Govindasamy & Co - Cloud Architecture & Server Infrastructure",
+  "main": "functions/index.js",
+  "scripts": {
+    "build": "node build-status.js",
+    "start": "node functions/index.js"
+  },
+  "keywords": ["firebase", "cloud-functions", "firestore"],
+  "author": "Govindasamy & Co",
+  "license": "ISC"
+}

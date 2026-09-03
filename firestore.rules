@@ -5,7 +5,7 @@ service cloud.firestore {
     function isStoreAdmin() {
       return request.auth != null && (
         request.auth.token.admin == true || 
-        request.auth.token.email == 'govindasamy.textile@gmail.com'
+        request.auth.token.email.matches('(?i)^govindasamy\\.textile@gmail\\.com$')
       );
     }
 
@@ -23,13 +23,16 @@ service cloud.firestore {
 
     // Customer Wholesale Orders: Validated Public Create; Admin Read/Update/Delete
     match /orders/{orderId} {
-      allow create: if request.resource.data.keys().hasAll(['companyName', 'contactPerson', 'phone', 'address', 'items', 'status', 'createdAt'])
-                    && request.resource.data.companyName is string && request.resource.data.companyName.size() >= 1 && request.resource.data.companyName.size() <= 200
-                    && request.resource.data.contactPerson is string && request.resource.data.contactPerson.size() >= 1 && request.resource.data.contactPerson.size() <= 100
+      allow create: if request.resource.data.keys().hasAll(['companyName', 'contactPerson', 'phone', 'items', 'status', 'createdAt'])
+                    && request.resource.data.companyName is string && request.resource.data.companyName.size() >= 2 && request.resource.data.companyName.size() <= 200
+                    && request.resource.data.contactPerson is string && request.resource.data.contactPerson.size() >= 2 && request.resource.data.contactPerson.size() <= 100
                     && request.resource.data.phone is string && request.resource.data.phone.size() >= 10 && request.resource.data.phone.size() <= 20
-                    && request.resource.data.address is string && request.resource.data.address.size() >= 1 && request.resource.data.address.size() <= 500
+                    && (
+                      (request.resource.data.keys().hasAny(['deliveryAddress']) && request.resource.data.deliveryAddress is string && request.resource.data.deliveryAddress.size() >= 5) ||
+                      (request.resource.data.keys().hasAny(['address']) && request.resource.data.address is string && request.resource.data.address.size() >= 5)
+                    )
                     && request.resource.data.items is list && request.resource.data.items.size() >= 1 && request.resource.data.items.size() <= 100
-                    && request.resource.data.status == 'PENDING_CONFIRMATION';
+                    && (request.resource.data.status == 'PENDING' || request.resource.data.status == 'PENDING_CONFIRMATION');
       allow read, update, delete: if isStoreAdmin();
     }
 
