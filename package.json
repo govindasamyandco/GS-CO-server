@@ -7,7 +7,14 @@
     "build": "node build-status.js",
     "start": "node functions/index.js"
   },
-  "keywords": ["firebase", "cloud-functions", "firestore"],
+  "keywords": [
+    "firebase",
+    "cloud-functions",
+    "firestore"
+  ],
   "author": "Govindasamy & Co",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "i": "^0.3.7"
+  }
 }
