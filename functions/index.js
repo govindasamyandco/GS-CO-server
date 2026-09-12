@@ -320,8 +320,6 @@ exports.packOrder = onCall(async (request) => {
 // and provides live health check endpoints and visual status report portal.
 // ==========================================================================
 const http = require("http");
-const fs = require("fs");
-const path = require("path");
 
 const server = http.createServer((req, res) => {
   // Global CORS Headers
