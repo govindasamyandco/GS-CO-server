@@ -1,6 +1,35 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const { packOrderEngine } = require("./packingEngine");
+const fs = require("fs");
+const path = require("path");
+
+// Strictly load .env file if present
+function loadEnv() {
+  const possiblePaths = [
+    path.join(__dirname, "..", ".env"),
+    path.join(__dirname, ".env")
+  ];
+  for (const envPath of possiblePaths) {
+    if (fs.existsSync(envPath)) {
+      const lines = fs.readFileSync(envPath, "utf-8").split(/\r?\n/);
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith("#")) continue;
+        const idx = trimmed.indexOf("=");
+        if (idx > 0) {
+          const key = trimmed.slice(0, idx).trim();
+          const val = trimmed.slice(idx + 1).trim().replace(/(^['"]|['"]$)/g, "");
+          if (!process.env[key]) {
+            process.env[key] = val;
+          }
+        }
+      }
+      break;
+    }
+  }
+}
+loadEnv();
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -370,10 +399,9 @@ const server = http.createServer((req, res) => {
           mfaAuthentication: "ENABLED (TOTP + Google Auth)"
         },
         portals: {
-          customerPortalUrl: process.env.CLIENT_USER_URL || (process.env.NODE_ENV === 'production' || process.env.RENDER ? 'https://govindasamyandco.web.app' : 'http://localhost:5173'),
-          ownerPortalUrl: process.env.CLIENT_OWNER_URL || (process.env.NODE_ENV === 'production' || process.env.RENDER ? 'https://govindasamy-admin.web.app' : 'http://localhost:3000'),
-          serverUrl: process.env.SERVER_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:10000',
-          environment: process.env.NODE_ENV || (process.env.RENDER ? 'production' : 'development')
+          customerPortalUrl: process.env.CLIENT_USER_URL || "https://govindasamyandco.web.app",
+          ownerPortalUrl: process.env.CLIENT_OWNER_URL || "https://govindasamy-admin.web.app",
+          serverUrl: process.env.SERVER_URL || "https://gs-co-server.onrender.com"
         },
         functions: ["addProduct", "updateProduct", "deleteProduct", "packOrder", "logSecurityAudit"],
         endpoints: ["/health", "/api/status", "/api/telemetry", "/api/pack-preview", "/report"]

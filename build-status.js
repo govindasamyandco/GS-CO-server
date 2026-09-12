@@ -1,14 +1,35 @@
 const fs = require('fs');
 const path = require('path');
 
+// Strictly load .env file if present
+function loadEnv() {
+  const envPath = path.join(__dirname, '.env');
+  if (fs.existsSync(envPath)) {
+    const lines = fs.readFileSync(envPath, 'utf-8').split(/\r?\n/);
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const idx = trimmed.indexOf('=');
+      if (idx > 0) {
+        const key = trimmed.slice(0, idx).trim();
+        const val = trimmed.slice(idx + 1).trim().replace(/(^['"]|['"]$)/g, '');
+        if (!process.env[key]) {
+          process.env[key] = val;
+        }
+      }
+    }
+  }
+}
+loadEnv();
+
 const publicDir = path.join(__dirname, 'public');
 if (!fs.existsSync(publicDir)) {
   fs.mkdirSync(publicDir, { recursive: true });
 }
 
-const isBuildProd = process.env.RENDER || process.env.NODE_ENV === 'production';
-const initialUserUrl = process.env.CLIENT_USER_URL || (isBuildProd ? 'https://gs-co-user.onrender.com' : 'http://localhost:5173');
-const initialOwnerUrl = process.env.CLIENT_OWNER_URL || (isBuildProd ? 'https://gs-co-owner.onrender.com' : 'http://localhost:3000');
+const userUrl = process.env.CLIENT_USER_URL || 'https://govindasamyandco.web.app';
+const ownerUrl = process.env.CLIENT_OWNER_URL || 'https://govindasamy-admin.web.app';
+const serverUrl = process.env.SERVER_URL || 'https://gs-co-server.onrender.com';
 
 const html = `<!DOCTYPE html>
 <html lang="en">
@@ -574,19 +595,19 @@ const html = `<!DOCTYPE html>
       </div>
 
       <div class="links-grid">
-        <a id="link-customer-portal" href="${initialUserUrl}" target="_blank" class="portal-link-btn">
+        <a id="link-customer-portal" href="${userUrl}" target="_blank" class="portal-link-btn">
           <span>
             <i class="fa-solid fa-store" style="margin-right: 0.4rem; color: #38bdf8;"></i>
             <strong id="label-customer-portal">Customer Portal</strong>
-            <span id="sub-customer-portal" style="display: block; font-size: 0.72rem; color: var(--text-muted); font-weight: normal;">${initialUserUrl}</span>
+            <span id="sub-customer-portal" style="display: block; font-size: 0.72rem; color: var(--text-muted); font-weight: normal;">${userUrl}</span>
           </span>
           <i class="fa-solid fa-arrow-up-right-from-square"></i>
         </a>
-        <a id="link-owner-portal" href="${initialOwnerUrl}" target="_blank" class="portal-link-btn">
+        <a id="link-owner-portal" href="${ownerUrl}" target="_blank" class="portal-link-btn">
           <span>
             <i class="fa-solid fa-user-shield" style="margin-right: 0.4rem; color: #f59e0b;"></i>
             <strong id="label-owner-portal">Owner Admin Portal</strong>
-            <span id="sub-owner-portal" style="display: block; font-size: 0.72rem; color: var(--text-muted); font-weight: normal;">${initialOwnerUrl}</span>
+            <span id="sub-owner-portal" style="display: block; font-size: 0.72rem; color: var(--text-muted); font-weight: normal;">${ownerUrl}</span>
           </span>
           <i class="fa-solid fa-arrow-up-right-from-square"></i>
         </a>
@@ -635,38 +656,29 @@ const html = `<!DOCTYPE html>
           document.getElementById('val-uptime').textContent = (hrs > 0 ? hrs + 'h ' : '') + mins + 'm ' + secs + 's';
         }
 
-        // Dynamic Portals & Hosted Endpoints Resolution
+        // Display Environment Badge
         const isProd = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
         const envBadge = document.getElementById('portal-env-badge');
         if (envBadge) {
-          envBadge.textContent = isProd ? 'LIVE HOSTED ENVIRONMENT' : 'LOCAL ENVIRONMENT';
+          envBadge.textContent = isProd ? 'LIVE HOSTED ENVIRONMENT' : 'ACTIVE ENVIRONMENT';
           envBadge.style.background = isProd ? 'rgba(34, 197, 94, 0.15)' : 'rgba(56, 189, 248, 0.15)';
           envBadge.style.color = isProd ? '#4ade80' : 'var(--accent-cyan)';
           envBadge.style.borderColor = isProd ? 'rgba(34, 197, 94, 0.3)' : 'rgba(56, 189, 248, 0.3)';
         }
 
         if (data.portals) {
-          let custUrl = data.portals.customerPortalUrl || (isProd ? 'https://govindasamyandco.web.app' : 'http://localhost:5173');
-          let ownerUrl = data.portals.ownerPortalUrl || (isProd ? 'https://govindasamy-admin.web.app' : 'http://localhost:3000');
-
-          if (isProd) {
-            if (custUrl.includes('localhost') || custUrl.includes('127.0.0.1')) {
-              custUrl = 'https://govindasamyandco.web.app';
-            }
-            if (ownerUrl.includes('localhost') || ownerUrl.includes('127.0.0.1')) {
-              ownerUrl = 'https://govindasamy-admin.web.app';
-            }
-          }
+          const custUrl = data.portals.customerPortalUrl;
+          const ownerUrl = data.portals.ownerPortalUrl;
 
           const linkCust = document.getElementById('link-customer-portal');
           const subCust = document.getElementById('sub-customer-portal');
-          if (linkCust) linkCust.href = custUrl;
-          if (subCust) subCust.textContent = custUrl;
+          if (linkCust && custUrl) linkCust.href = custUrl;
+          if (subCust && custUrl) subCust.textContent = custUrl;
 
           const linkOwner = document.getElementById('link-owner-portal');
           const subOwner = document.getElementById('sub-owner-portal');
-          if (linkOwner) linkOwner.href = ownerUrl;
-          if (subOwner) subOwner.textContent = ownerUrl;
+          if (linkOwner && ownerUrl) linkOwner.href = ownerUrl;
+          if (subOwner && ownerUrl) subOwner.textContent = ownerUrl;
         }
       } catch (err) {
         console.warn('Telemetry fetch error:', err);
