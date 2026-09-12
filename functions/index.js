@@ -1,5 +1,6 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
+const { packOrderEngine } = require("./packingEngine");
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -98,7 +99,9 @@ const ALLOWED_PRODUCT_FIELDS = [
   "imageUrl",
   "stockQty",
   "seasonNotice",
-  "isDisabled"
+  "isDisabled",
+  "inStock",
+  "stockStatus"
 ];
 
 /**
@@ -137,7 +140,7 @@ exports.updateProduct = onCall(async (request) => {
     if (updateData[field] !== undefined) {
       if (["baseRate", "bundlePieces", "bundlesPerPack", "compressibility", "stockQty"].includes(field)) {
         sanitizedUpdate[field] = Number(updateData[field]);
-      } else if (field === "isDisabled") {
+      } else if (field === "isDisabled" || field === "inStock") {
         sanitizedUpdate[field] = Boolean(updateData[field]);
       } else {
         sanitizedUpdate[field] = String(updateData[field]).trim();
@@ -212,11 +215,84 @@ exports.deleteProduct = onCall(async (request) => {
 });
 
 // ==========================================================================
-// HTTP Server for Render Hosting (Web Service Mode)
+// Cloud Function: packOrder
+// Runs the Best-Fit Decreasing packing engine for a submitted order,
+// saves the bale allocation to Firestore and returns the full result.
+// Auth required (any authenticated user — same session as order submission).
+// ==========================================================================
+exports.packOrder = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Authentication required.");
+  }
+
+  const { orderId, items } = request.data;
+
+  if (!orderId || typeof orderId !== "string") {
+    throw new HttpsError("invalid-argument", "orderId is required.");
+  }
+
+  if (!Array.isArray(items) || items.length === 0) {
+    throw new HttpsError("invalid-argument", "items array is required and must not be empty.");
+  }
+
+  // Validate each item
+  for (const it of items) {
+    if (!it.itemId || typeof it.itemId !== "string") {
+      throw new HttpsError("invalid-argument", `Invalid itemId: ${it.itemId}`);
+    }
+    const qty = Number(it.orderedBundles);
+    if (!Number.isInteger(qty) || qty <= 0) {
+      throw new HttpsError("invalid-argument", `orderedBundles must be a positive integer for item ${it.itemId}`);
+    }
+    const bpp = Number(it.bundlesPerPack);
+    if (!Number.isInteger(bpp) || bpp <= 0) {
+      throw new HttpsError("invalid-argument", `bundlesPerPack must be a positive integer for item ${it.itemId}`);
+    }
+  }
+
+  // Run the packing engine
+  const packingResult = packOrderEngine(items);
+
+  // Persist the bale allocation to Firestore
+  const baleDocRef = db.collection("master_bales").doc(orderId);
+  await baleDocRef.set({
+    orderId,
+    totalBales:    packingResult.totalBales,
+    totalBundles:  packingResult.totalBundles,
+    totalPieces:   packingResult.totalPieces,
+    bales:         packingResult.bales,
+    packedBy:      request.auth.uid,
+    packedAt:      admin.firestore.FieldValue.serverTimestamp()
+  });
+
+  // Also update the parent order document with the confirmed bale count
+  try {
+    await db.collection("orders").doc(orderId).update({
+      estBales:   packingResult.totalBales,
+      balesPacked: true,
+      updatedAt:  admin.firestore.FieldValue.serverTimestamp()
+    });
+  } catch (_) {
+    // Non-fatal: order doc may not exist yet if called before submission
+  }
+
+  return {
+    success:      true,
+    totalBales:   packingResult.totalBales,
+    totalBundles: packingResult.totalBundles,
+    totalPieces:  packingResult.totalPieces,
+    bales:        packingResult.bales
+  };
+});
+
+// ==========================================================================
+// HTTP Server for Render Hosting & Local Development
 // Listens on process.env.PORT so Render Web Service stays permanently active
-// and provides live health check endpoints.
+// and provides live health check endpoints and visual status report portal.
 // ==========================================================================
 const http = require("http");
+const fs = require("fs");
+const path = require("path");
 
 const server = http.createServer((req, res) => {
   // Global CORS Headers
@@ -230,8 +306,27 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // Health Check Endpoint for Render Deployments
-  if (req.url === "/" || req.url === "/health") {
+  const urlPath = req.url.split("?")[0];
+  const wantsJson = req.url.includes("format=json") || (req.headers.accept && req.headers.accept.includes("application/json") && !req.headers.accept.includes("text/html"));
+
+  // Serve Visual Health Report / HTML Dashboard for root, /health, /status, /report
+  if ((urlPath === "/" || urlPath === "/health" || urlPath === "/status" || urlPath === "/report") && !wantsJson) {
+    // Try finding index.html in public dir
+    const possiblePaths = [
+      path.join(__dirname, "..", "public", "index.html"),
+      path.join(__dirname, "public", "index.html")
+    ];
+    for (const p of possiblePaths) {
+      if (fs.existsSync(p)) {
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+        res.end(fs.readFileSync(p, "utf-8"));
+        return;
+      }
+    }
+  }
+
+  // Health Check Endpoint (JSON)
+  if (urlPath === "/" || urlPath === "/health") {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(
       JSON.stringify({
@@ -240,20 +335,31 @@ const server = http.createServer((req, res) => {
         timestamp: new Date().toISOString(),
         cloudDatabase: "Firestore",
         cloudStorage: "Firebase Storage",
-        endpoints: ["/health", "/api/status"]
-      })
+        functions: ["addProduct", "updateProduct", "deleteProduct", "packOrder", "logSecurityAudit"],
+        endpoints: ["/health", "/api/status", "/report"]
+      }, null, 2)
     );
     return;
   }
 
-  if (req.url === "/api/status") {
+  if (urlPath === "/api/status") {
+    const mem = process.memoryUsage();
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(
       JSON.stringify({
         project: "govindasamyandco",
-        functions: ["addProduct", "updateProduct", "deleteProduct", "logSecurityAudit"],
-        uptime: process.uptime()
-      })
+        status: "OPERATIONAL",
+        nodeVersion: process.version,
+        platform: process.platform,
+        uptimeSeconds: Math.floor(process.uptime()),
+        memory: {
+          rssMb: (mem.rss / 1024 / 1024).toFixed(2),
+          heapUsedMb: (mem.heapUsed / 1024 / 1024).toFixed(2),
+          heapTotalMb: (mem.heapTotal / 1024 / 1024).toFixed(2)
+        },
+        functions: ["addProduct", "updateProduct", "deleteProduct", "packOrder", "logSecurityAudit"],
+        timestamp: new Date().toISOString()
+      }, null, 2)
     );
     return;
   }
@@ -262,7 +368,7 @@ const server = http.createServer((req, res) => {
   res.end(JSON.stringify({ error: "Endpoint not found" }));
 });
 
-// Automatically start listening on PORT when run directly by Render
+// Automatically start listening on PORT when run directly by Render or node start
 if (require.main === module || process.env.PORT) {
   const PORT = process.env.PORT || 10000;
   server.listen(PORT, "0.0.0.0", () => {

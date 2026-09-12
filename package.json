@@ -5,7 +5,8 @@
   "main": "functions/index.js",
   "scripts": {
     "build": "node build-status.js",
-    "start": "node functions/index.js"
+    "start": "node functions/index.js",
+    "test": "node functions/packetEngine.test.js"
   },
   "keywords": [
     "firebase",

@@ -5,7 +5,7 @@ service cloud.firestore {
     function isStoreAdmin() {
       return request.auth != null && (
         request.auth.token.admin == true || 
-        request.auth.token.email.matches('(?i)^govindasamy\\.textile@gmail\\.com$')
+        request.auth.token.email.matches('(?i)^govindasamy\\.(textitle|textile)@gmail\\.com$')
       );
     }
 
@@ -40,6 +40,14 @@ service cloud.firestore {
     match /audit_logs/{logId} {
       allow read: if isStoreAdmin();
       allow write: if false; // Only Cloud Functions Admin SDK can write
+    }
+
+    // Master Bales Packing Breakdown: Public Create for order placement; Admin Read/Update
+    match /master_bales/{orderId} {
+      allow read: if isStoreAdmin();
+      allow write: if isStoreAdmin();
+      allow create: if request.resource.data.keys().hasAll(['orderId', 'bales', 'totalBales'])
+                    && request.resource.data.bales is list;
     }
   }
 }
