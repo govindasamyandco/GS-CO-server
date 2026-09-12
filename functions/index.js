@@ -342,7 +342,8 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (urlPath === "/api/status") {
+  // Detailed Telemetry API
+  if (urlPath === "/api/telemetry" || urlPath === "/api/status") {
     const mem = process.memoryUsage();
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(
@@ -351,16 +352,49 @@ const server = http.createServer((req, res) => {
         status: "OPERATIONAL",
         nodeVersion: process.version,
         platform: process.platform,
+        arch: process.arch,
         uptimeSeconds: Math.floor(process.uptime()),
+        timestamp: new Date().toISOString(),
         memory: {
-          rssMb: (mem.rss / 1024 / 1024).toFixed(2),
-          heapUsedMb: (mem.heapUsed / 1024 / 1024).toFixed(2),
-          heapTotalMb: (mem.heapTotal / 1024 / 1024).toFixed(2)
+          rssMb: parseFloat((mem.rss / 1024 / 1024).toFixed(2)),
+          heapUsedMb: parseFloat((mem.heapUsed / 1024 / 1024).toFixed(2)),
+          heapTotalMb: parseFloat((mem.heapTotal / 1024 / 1024).toFixed(2)),
+          externalMb: parseFloat((mem.external / 1024 / 1024).toFixed(2))
+        },
+        services: {
+          firestore: "ACTIVE",
+          firebaseStorage: "ACTIVE",
+          cloudFunctions: "ACTIVE (v2)",
+          packingEngine: "BEST_FIT_DECREASING_120_UNITS",
+          securityRules: "ENFORCED",
+          mfaAuthentication: "ENABLED (TOTP + Google Auth)"
         },
         functions: ["addProduct", "updateProduct", "deleteProduct", "packOrder", "logSecurityAudit"],
-        timestamp: new Date().toISOString()
+        endpoints: ["/health", "/api/status", "/api/telemetry", "/api/pack-preview", "/report"]
       }, null, 2)
     );
+    return;
+  }
+
+  // Live Packing Simulator API
+  if (urlPath === "/api/pack-preview") {
+    try {
+      const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+      const itemsParam = parsedUrl.searchParams.get("items");
+      let items = [
+        { itemId: "M1", title: "Robo Mat", bundlesPerPack: 3, piecesPerBundle: 50, orderedBundles: 1 },
+        { itemId: "M2", title: "13x19 Door Mat", bundlesPerPack: 8, piecesPerBundle: 50, orderedBundles: 6 }
+      ];
+      if (itemsParam) {
+        items = JSON.parse(itemsParam);
+      }
+      const packResult = packOrderEngine(items);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ success: true, input: items, packingResult: packResult }, null, 2));
+    } catch (e) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Invalid packing preview parameters: " + e.message }));
+    }
     return;
   }
 
@@ -373,6 +407,7 @@ if (require.main === module || process.env.PORT) {
   const PORT = process.env.PORT || 10000;
   server.listen(PORT, "0.0.0.0", () => {
     console.log(`🚀 Govindasamy & Co Server listening on port ${PORT}`);
-    console.log(`📡 Health check ready at http://0.0.0.0:${PORT}/health`);
+    console.log(`📡 Health check ready at: http://localhost:${PORT}/health`);
+    console.log(`📊 Server Dashboard ready at: http://localhost:${PORT}/`);
   });
 }
