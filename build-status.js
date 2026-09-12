@@ -6,6 +6,10 @@ if (!fs.existsSync(publicDir)) {
   fs.mkdirSync(publicDir, { recursive: true });
 }
 
+const isBuildProd = process.env.RENDER || process.env.NODE_ENV === 'production';
+const initialUserUrl = process.env.CLIENT_USER_URL || (isBuildProd ? 'https://gs-co-user.onrender.com' : 'http://localhost:5173');
+const initialOwnerUrl = process.env.CLIENT_OWNER_URL || (isBuildProd ? 'https://gs-co-owner.onrender.com' : 'http://localhost:3000');
+
 const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -559,25 +563,47 @@ const html = `<!DOCTYPE html>
 
     <!-- 5. Quick Portals Navigation -->
     <section class="section-card">
-      <h2 class="section-title">
-        <i class="fa-solid fa-compass" style="color: var(--accent-gold);"></i>
-        Quick App Portals & Endpoints
-      </h2>
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
+        <h2 class="section-title" style="margin-bottom: 0;">
+          <i class="fa-solid fa-compass" style="color: var(--accent-gold);"></i>
+          Quick App Portals & Endpoints
+        </h2>
+        <span id="portal-env-badge" style="font-size: 0.75rem; background: rgba(56, 189, 248, 0.15); color: var(--accent-cyan); border: 1px solid rgba(56, 189, 248, 0.3); padding: 0.2rem 0.6rem; border-radius: 999px; font-weight: 600;">
+          Resolving Endpoints...
+        </span>
+      </div>
+
       <div class="links-grid">
-        <a href="http://localhost:5173" target="_blank" class="portal-link-btn">
-          <span><i class="fa-solid fa-store" style="margin-right: 0.4rem; color: #38bdf8;"></i> Customer Portal (:5173)</span>
+        <a id="link-customer-portal" href="${initialUserUrl}" target="_blank" class="portal-link-btn">
+          <span>
+            <i class="fa-solid fa-store" style="margin-right: 0.4rem; color: #38bdf8;"></i>
+            <strong id="label-customer-portal">Customer Portal</strong>
+            <span id="sub-customer-portal" style="display: block; font-size: 0.72rem; color: var(--text-muted); font-weight: normal;">${initialUserUrl}</span>
+          </span>
           <i class="fa-solid fa-arrow-up-right-from-square"></i>
         </a>
-        <a href="http://localhost:3000" target="_blank" class="portal-link-btn">
-          <span><i class="fa-solid fa-user-shield" style="margin-right: 0.4rem; color: #f59e0b;"></i> Owner Portal (:3000)</span>
+        <a id="link-owner-portal" href="${initialOwnerUrl}" target="_blank" class="portal-link-btn">
+          <span>
+            <i class="fa-solid fa-user-shield" style="margin-right: 0.4rem; color: #f59e0b;"></i>
+            <strong id="label-owner-portal">Owner Admin Portal</strong>
+            <span id="sub-owner-portal" style="display: block; font-size: 0.72rem; color: var(--text-muted); font-weight: normal;">${initialOwnerUrl}</span>
+          </span>
           <i class="fa-solid fa-arrow-up-right-from-square"></i>
         </a>
-        <a href="/api/telemetry" target="_blank" class="portal-link-btn">
-          <span><i class="fa-solid fa-code" style="margin-right: 0.4rem; color: #4ade80;"></i> JSON Telemetry API</span>
+        <a id="link-telemetry-api" href="/api/telemetry" target="_blank" class="portal-link-btn">
+          <span>
+            <i class="fa-solid fa-code" style="margin-right: 0.4rem; color: #4ade80;"></i>
+            <strong>JSON Telemetry API</strong>
+            <span style="display: block; font-size: 0.72rem; color: var(--text-muted); font-weight: normal;">/api/telemetry</span>
+          </span>
           <i class="fa-solid fa-arrow-up-right-from-square"></i>
         </a>
-        <a href="/health?format=json" target="_blank" class="portal-link-btn">
-          <span><i class="fa-solid fa-heart-pulse" style="margin-right: 0.4rem; color: #ef4444;"></i> Health JSON Endpoint</span>
+        <a id="link-health-api" href="/health?format=json" target="_blank" class="portal-link-btn">
+          <span>
+            <i class="fa-solid fa-heart-pulse" style="margin-right: 0.4rem; color: #ef4444;"></i>
+            <strong>Health JSON Endpoint</strong>
+            <span style="display: block; font-size: 0.72rem; color: var(--text-muted); font-weight: normal;">/health?format=json</span>
+          </span>
           <i class="fa-solid fa-arrow-up-right-from-square"></i>
         </a>
       </div>
@@ -607,6 +633,40 @@ const html = `<!DOCTYPE html>
           const mins = Math.floor((s % 3600) / 60);
           const secs = s % 60;
           document.getElementById('val-uptime').textContent = (hrs > 0 ? hrs + 'h ' : '') + mins + 'm ' + secs + 's';
+        }
+
+        // Dynamic Portals & Hosted Endpoints Resolution
+        const isProd = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+        const envBadge = document.getElementById('portal-env-badge');
+        if (envBadge) {
+          envBadge.textContent = isProd ? 'LIVE HOSTED ENVIRONMENT' : 'LOCAL ENVIRONMENT';
+          envBadge.style.background = isProd ? 'rgba(34, 197, 94, 0.15)' : 'rgba(56, 189, 248, 0.15)';
+          envBadge.style.color = isProd ? '#4ade80' : 'var(--accent-cyan)';
+          envBadge.style.borderColor = isProd ? 'rgba(34, 197, 94, 0.3)' : 'rgba(56, 189, 248, 0.3)';
+        }
+
+        if (data.portals) {
+          let custUrl = data.portals.customerPortalUrl || (isProd ? 'https://govindasamyandco.web.app' : 'http://localhost:5173');
+          let ownerUrl = data.portals.ownerPortalUrl || (isProd ? 'https://govindasamy-admin.web.app' : 'http://localhost:3000');
+
+          if (isProd) {
+            if (custUrl.includes('localhost') || custUrl.includes('127.0.0.1')) {
+              custUrl = 'https://govindasamyandco.web.app';
+            }
+            if (ownerUrl.includes('localhost') || ownerUrl.includes('127.0.0.1')) {
+              ownerUrl = 'https://govindasamy-admin.web.app';
+            }
+          }
+
+          const linkCust = document.getElementById('link-customer-portal');
+          const subCust = document.getElementById('sub-customer-portal');
+          if (linkCust) linkCust.href = custUrl;
+          if (subCust) subCust.textContent = custUrl;
+
+          const linkOwner = document.getElementById('link-owner-portal');
+          const subOwner = document.getElementById('sub-owner-portal');
+          if (linkOwner) linkOwner.href = ownerUrl;
+          if (subOwner) subOwner.textContent = ownerUrl;
         }
       } catch (err) {
         console.warn('Telemetry fetch error:', err);

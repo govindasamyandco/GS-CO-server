@@ -369,6 +369,12 @@ const server = http.createServer((req, res) => {
           securityRules: "ENFORCED",
           mfaAuthentication: "ENABLED (TOTP + Google Auth)"
         },
+        portals: {
+          customerPortalUrl: process.env.CLIENT_USER_URL || (process.env.NODE_ENV === 'production' || process.env.RENDER ? 'https://govindasamyandco.web.app' : 'http://localhost:5173'),
+          ownerPortalUrl: process.env.CLIENT_OWNER_URL || (process.env.NODE_ENV === 'production' || process.env.RENDER ? 'https://govindasamy-admin.web.app' : 'http://localhost:3000'),
+          serverUrl: process.env.SERVER_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:10000',
+          environment: process.env.NODE_ENV || (process.env.RENDER ? 'production' : 'development')
+        },
         functions: ["addProduct", "updateProduct", "deleteProduct", "packOrder", "logSecurityAudit"],
         endpoints: ["/health", "/api/status", "/api/telemetry", "/api/pack-preview", "/report"]
       }, null, 2)
