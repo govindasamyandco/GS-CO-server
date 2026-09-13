@@ -430,8 +430,121 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  res.writeHead(404, { "Content-Type": "application/json" });
-  res.end(JSON.stringify({ error: "Endpoint not found" }));
+  // Serve Static Assets (Lottie JSON animations, icons, etc.)
+  const normalizedAssetPath = decodeURIComponent(urlPath.replace(/^\/assets\//, "/").replace(/^\//, ""));
+  const staticPaths = [
+    path.join(__dirname, "..", "public", normalizedAssetPath),
+    path.join(__dirname, "public", normalizedAssetPath),
+    path.join(__dirname, "..", "public", urlPath.replace(/^\//, "")),
+    path.join(__dirname, "public", urlPath.replace(/^\//, ""))
+  ];
+  for (const sp of staticPaths) {
+    if (fs.existsSync(sp) && fs.statSync(sp).isFile()) {
+      const ext = path.extname(sp).toLowerCase();
+      const contentType = ext === ".json" ? "application/json" : ext === ".html" ? "text/html" : ext === ".js" ? "application/javascript" : ext === ".css" ? "text/css" : "application/octet-stream";
+      res.writeHead(200, { "Content-Type": contentType });
+      res.end(fs.readFileSync(sp));
+      return;
+    }
+  }
+
+  // If client wants JSON or API route not found
+  if (wantsJson || urlPath.startsWith("/api/")) {
+    res.writeHead(404, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "Endpoint not found", path: urlPath, status: 404 }));
+    return;
+  }
+
+  // Rich 404 HTML Response with Embedded Lottie Animation
+  res.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
+  res.end(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>404 Not Found — Govindasamy & Co</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/bodymovin/5.12.2/lottie.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 2rem 1rem;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: #030d22;
+      color: #f8fafc;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      box-sizing: border-box;
+    }
+    .card-404 {
+      background: rgba(10, 25, 54, 0.85);
+      border: 1px solid rgba(56, 189, 248, 0.2);
+      border-radius: 16px;
+      padding: 2.5rem 2rem;
+      max-width: 500px;
+      width: 100%;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+    }
+    #lottie-404 {
+      width: 240px;
+      height: 200px;
+      margin: 0 auto 1rem auto;
+    }
+    h1 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: #38bdf8;
+      margin-bottom: 0.5rem;
+    }
+    p {
+      color: #94a3b8;
+      font-size: 0.92rem;
+      line-height: 1.5;
+      margin-bottom: 1.5rem;
+    }
+    .btn-home {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: #0284c7;
+      color: #ffffff;
+      padding: 0.75rem 1.4rem;
+      border-radius: 8px;
+      font-weight: 700;
+      text-decoration: none;
+      transition: background 0.2s;
+    }
+    .btn-home:hover {
+      background: #0369a1;
+    }
+  </style>
+</head>
+<body>
+  <div class="card-404">
+    <div id="lottie-404"></div>
+    <h1>404 — Page Not Found</h1>
+    <p>The server endpoint or resource you requested does not exist on this server.</p>
+    <a href="/" class="btn-home"><i class="fa-solid fa-house"></i> Return to Telemetry Dashboard</a>
+  </div>
+  <script>
+    bodymovin.loadAnimation({
+      container: document.getElementById('lottie-404'),
+      renderer: 'svg',
+      loop: true,
+      autoplay: true,
+      path: '/Error%20404.json'
+    });
+  </script>
+</body>
+</html>`);
 });
 
 // Automatically start listening on PORT when run directly by Render or node start
